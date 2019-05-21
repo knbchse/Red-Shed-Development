@@ -12,7 +12,7 @@ private:
     float delay;          // delay between switching magnets (in us)
     Ticker t;           // ticker timer
 
-
+d
 public:
     Stepper(PinName p0, PinName p1, PinName p2, bool d, unsigned int p, unsigned int s):        // direction pin, step pin, direction, delay(us)
         dirPin(p0), stepPin(p1), endStop(p2)       // setup stepper pins
