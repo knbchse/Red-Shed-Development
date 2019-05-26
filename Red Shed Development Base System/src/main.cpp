@@ -121,10 +121,18 @@ void Stepper::setDirection(int d) {
 
 //===[End of Stepper Class]===
 int main() {
+  Stepper leadscrew_motor1(PB_12, PA_11, PB_5, 0, 200, 32); // 3
+  Stepper leadscrew_motor2(PB_1, PB_2, PB_3, 0, 200, 32); // 3
+  Initialise();
+  leadscrew_motor1.initialise();
+  leadscrew_motor2.initialise();
 
   // put your setup code here, to run once:
 
   while(1) {
+    leadscrew_motor1.run(250);
+    leadscrew_motor2.run(250);
+
     // put your main code here, to run repeatedly:
   }
 }
