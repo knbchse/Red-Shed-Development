@@ -1,138 +1,298 @@
-#include <mbed.h>
-//===[Stepper Class]===
-class Stepper {
-private:
-    InterruptIn endStop;
-    DigitalOut dirPin;      // stepper direction pin
-    DigitalOut stepPin;     // stepper atep pin
-    bool direction;     // direction (0-1)
-    bool on;            // true-motor on, false-motor off
-    unsigned int pulseCount;        // no of pulses
-    unsigned int stepMode;
-    float delay;          // delay between switching magnets (in us)
-    Ticker t;           // ticker timer
+#include "mbed.h"
+#include "uart.h"
+#include "mbed.h"
+#include "string.h"
+#define LCD_DATA 1
+#define LCD_INSTRUCTION 0
 
-d
-public:
-    Stepper(PinName p0, PinName p1, PinName p2, bool d, unsigned int p, unsigned int s):        // direction pin, step pin, direction, delay(us)
-        dirPin(p0), stepPin(p1), endStop(p2)       // setup stepper pins
+PwmOut servo1(PA_0);
+PwmOut servo2(PA_1);
+PwmOut servo3(PB_0);
+DigitalOut stepper(PA_11);
+DigitalOut direction(PB_12);
+DigitalIn  endstop(PB_5);
+Uart uart(PA_2, PA_3);
+
+Ticker t;
+char str1[16];
+int i;
+void Store(char column, char level);
+void Retrieve(char column, char level);
+void toggleDirection(void);
+void stepperInitialise(void);
+void motorun(int duration);
+
+void toggleDirection(void)
+{
+    direction = ~direction;
+}
+
+void motorun(int duration)
+{
+    for (int i = 0; i < duration; i++)
     {
-        dirPin = d;         // set initial direction
-        on = false;         // initailally off
-        pulseCount = 0;     // reset pulse count
-        stepMode = s;
-        delay = p;          // set initial delay
-        endStop.mode(PullUp);
-        endStop.fall( this, &Stepper::stop);
-
+        stepper.write(1);
+        wait_ms(2);
+        stepper.write(0);
+        wait_ms(2);
     }
-    void pulse(void);       // declare functions
-    void run(unsigned int period);
-    void stop(void);
-    void toggleDirection(void);
-    void toggleOn(void);
-    void runPulse(unsigned int n);
-    void ramp(unsigned int c);
-    void distance(unsigned int d);
-    void initialise(void);
-    void Rotate(void);
-    void setDirection(int d);
+}
+
+void stepperInitialise(void)
+{
+    while(1)
+    {
+        stepper.write(1);
+        wait_ms(2);
+        stepper.write(0);
+        wait_ms(2);
+        if (endstop == 0)
+        {
+            return;
+        }
+    }
+}
+
+//--------BEGINING OF LCD CLASS-----------//
+class LCD
+{
+    private:
+        DigitalOut lcdD4, lcdD5, lcdD6, lcdD7;
+        DigitalOut lcdEN, lcdRS;
+        Ticker lcdt;
+
+    public:
+        LCD(PinName p0, PinName p1, PinName p2, PinName p3, PinName p4, PinName p5):
+            lcdD4(p0), lcdD5(p1), lcdD6(p2), lcdD7(p3), lcdEN(p4), lcdRS(p5) {}     // setup  pins
+        void lcdCommand(unsigned char command);
+        void lcdPutChar(unsigned char c);
+        void Initialise(void);
+        void lcdSetRS(int mode); //-- mode is either LCD_DATA or LCD_INSTRUCTION
+        void lcdPulseEN(void);
+        void lcdInit8Bit(unsigned char command);
 
 };
 
-void Stepper::pulse(void) {
-    stepPin = !stepPin;     // do half a pulse
-    pulseCount++;           // count 1
+
+void LCD::Initialise(void)
+{
+
+    lcdEN.write(0); //-- GPIO_WriteBit(GPIOC, LCD_EN, Bit_RESET);
+    wait_us(15000); //-- delay for >15msec second after power on
+    lcdInit8Bit(0x30); //-- we are in "8bit" mode
+    wait_us(4100); //-- 4.1msec delay
+    lcdInit8Bit(0x30); //-- but the bottom 4 bits are ignored
+    wait_us(100); //-- 100usec delay
+    lcdInit8Bit(0x30);
+    lcdInit8Bit(0x20);
+    lcdCommand(0x28); //-- we are now in 4bit mode, dual line
+    lcdCommand(0x08); //-- display off
+    lcdCommand(0x01); //-- display clear
+    wait_us(2000); //-- needs a 2msec delay !!
+    lcdCommand(0x06); //-- cursor increments
+    lcdCommand(0x0c); //-- display on, cursor(blinks) off
 }
 
-void Stepper::run(unsigned int period) {
-    if (period != 0) {
-        delay = period;
-    }
-    endStop.mode(PullUp);
-    t.attach_us(this, &Stepper::pulse, delay);      // attach the pulse to the ticker timer
-    on = true;
+
+void LCD::lcdSetRS(int mode) {
+    lcdRS.write(mode);
 }
 
-void Stepper::stop(void) {
-    stepPin = 0;        // turn all pins off
-    pulseCount = 0;     // reset pulse count
-    t.detach();         // turn of ticker
-    on = false;
+
+void LCD::lcdPulseEN(void)  {
+    lcdEN.write(1);
+    wait_us(1); //-- enable pulse must be >450ns
+    lcdEN.write(0);
+    wait_us(1);
 }
 
-void Stepper::toggleDirection(void) {
-    dirPin = !dirPin;       // toggle direction
+
+void LCD::lcdInit8Bit(unsigned char command)  {
+    lcdSetRS(LCD_INSTRUCTION);
+    lcdD4.write((command>>4) & 0x01); //-- bottom 4 bits
+    lcdD5.write((command>>5) & 0x01); //-- are ignored
+    lcdD6.write((command>>6) & 0x01);
+    lcdD7.write((command>>7) & 0x01);
+    lcdPulseEN();
+    wait_us(37); //-- let it work on the data
 }
 
-void Stepper::toggleOn(void) {
-    if (on == false)            // if off
-        Stepper::run(0);    // turn on
-    else
-        Stepper::stop();        // else turn off
+
+void LCD::lcdCommand(unsigned char command)  {
+    lcdSetRS(LCD_INSTRUCTION);
+    lcdD4.write((command>>4) & 0x01);
+    lcdD5.write((command>>5) & 0x01);
+    lcdD6.write((command>>6) & 0x01);
+    lcdD7.write((command>>7) & 0x01);
+    lcdPulseEN(); //-- this can't be too slow or it will time out
+    lcdD4.write(command & 0x01);
+    lcdD5.write((command>>1) & 0x01);
+    lcdD6.write((command>>2) & 0x01);
+    lcdD7.write((command>>3) & 0x01);
+    lcdPulseEN();
+    wait_us(37); //-- let it work on the data
 }
 
-void Stepper::runPulse(unsigned int n) {
-    pulseCount = 0;
-    Stepper::run(0);
-    while (pulseCount <= n*stepMode*50) {
-        wait(.01);
-    }
-    Stepper::stop();
+
+void LCD::lcdPutChar(unsigned char c)  {
+    lcdSetRS(LCD_DATA);
+    lcdD4.write((c>>4) & 0x01);
+    lcdD5.write((c>>5) & 0x01);
+    lcdD6.write((c>>6) & 0x01);
+    lcdD7.write((c>>7) & 0x01);
+    lcdPulseEN(); //-- this can't be too slow or it will time out
+    lcdD4.write(c & 0x01);
+    lcdD5.write((c>>1) & 0x01);
+    lcdD6.write((c>>2) & 0x01);
+    lcdD7.write((c>>3) & 0x01);
+    lcdPulseEN();
+    wait_us(37); //-- let it work on the data
 }
 
-void Stepper::ramp(unsigned int c)  {
-    }
 
-void Stepper::distance(unsigned int d)  {
-    pulseCount = 0;
-    int h = 400;
-    while (h > 60)  {
-        Stepper::run(h);
-        wait(.01);
-        h--;
-    }
-    Stepper::run(0);
+//-----------END OF LCD CLASS-------------//
 
-    while (pulseCount <= ((d-5)*800)) {
-        wait(.1);
+
+int main()
+{
+    LCD lcd(PA_9, PA_8, PB_10, PB_4, PC_7, PB_6);
+    stepperInitialise();
+    direction = 0;
+    endstop.mode(PullUp);
+    lcd.Initialise();
+    servo.period_us(20000); //-- 20 ms time period
+    servo.pulsewidth_us(1000); //-- pulse width of 1 ms; 0 degrees'
+    while (1) {
+
+        char s[80];
+        if (uart.canReadLine()) {
+            uart.readLine(s);
+            s[strlen(s)-1] = '\0';
         }
-    while (pulseCount <= (d*800))  {
-        Stepper::run(h);
-        wait(.00001);
-        h++;
+
+        if (s[0] == 'R')       {
+            lcd.Initialise();
+            sprintf(str1, "Retrieving %c %c", s[1], s[2]);
+            i = 0;
+            while(str1[i]) {
+                lcd.lcdPutChar(str1[i]);
+                i++;
+            }
+            Retrieve(s[1], s[2]);
+            wait(2);
+            lcd.lcdCommand(0x01); //-- display clear
+            wait_us(2000); //-- needs a 2msec delay
+            lcd.lcdCommand(0x06); //-- cursor increments
+            sprintf(str1, "D\n");
+            uart.putString(str1);
+            sprintf(str1, "Done");
+            i = 0;
+            while(str1[i]) {
+                lcd.lcdPutChar(str1[i]);
+                i++;
+            }
+        }
+
+        if (s[0] == 'S')  {
+            lcd.Initialise();
+            sprintf(str1, "Storing in %c %c", s[1], s[2]);
+            i = 0;
+            while(str1[i]) {
+                lcd.lcdPutChar(str1[i]);
+                i++;
+            }
+            Store(s[1], s[2]);
+            wait(2);
+            lcd.lcdCommand(0x01); //-- display clear
+            wait_us(2000); //-- needs a 2msec delay
+            lcd.lcdCommand(0x06); //-- cursor increments
+            sprintf(str1, "D\n");
+            uart.putString(str1);
+            sprintf(str1, "Done");
+            i = 0;
+            while(str1[i]) {
+                lcd.lcdPutChar(str1[i]);
+                i++;
+            }
+        }
+        s[0] = '0';
     }
-    Stepper::stop();
 }
 
-void Stepper::initialise(void) {
-    Stepper::setDirection(0);
-    endStop.mode(PullUp);
-    Stepper::run(100);
-    while (endStop == 1) {
+void Store(char column, char level)
+{
+    if(level == 'A')
+    {
+        motorun(250); // Initial Height level A set
     }
-    Stepper::toggleDirection();
-    Stepper::stop();
+    else
+    {
+        motorun(500); // Initial Height level B set
+    }
+    wait(1);
+    toggleDirection();
+    switch (column)
+    {
+        case '1' :  servo1.pulsewidth_us(2000);// Servo out
+                    wait(1);
+                    motorun(100); // Move shelf down slightly
+                    wait(1);
+                    servo1.pulsewidth_us(1000);// Servo in
+                    break;
+        case '2' :  servo2.pulsewidth_us(2000);// Servo out
+                    wait(1);
+                    motorun(100); // Move shelf down slightly
+                    wait(1);
+                    servo2.pulsewidth_us(1000);// Servo in
+                    break;
+        case '3' :  servo3.pulsewidth_us(2000);// Servo out
+                    wait(1);
+                    motorun(100); // Move shelf down slightly
+                    wait(1);
+                    servo3.pulsewidth_us(1000);// Servo in
+                    break;
+        default  :  break;
+
+    }
+    wait(1);
+    stepperInitialise(); // Return Shelf to home
 }
 
-void Stepper::setDirection(int d) {
-    dirPin= d;
-}
+void Retrieve(char column, char level)
+{
+    if(level == 'A')
+    {
+        motorun(245); // Initial Height level A set
+    }
+    else
+    {
+        motorun(495); // Initial Height level B set
+    }
+    wait(1);
+    switch (column)
+    {
+        case '1' :  servo1.pulsewidth_us(2000);// Servo out
+                    wait(1);
+                    motorun(100); // Move shelf down slightly
+                    wait(1);
+                    servo1.pulsewidth_us(1000);// Servo in
+                    break;
+        case '2' :  servo2.pulsewidth_us(2000);// Servo out
+                    wait(1);
+                    motorun(100); // Move shelf down slightly
+                    wait(1);
+                    servo2.pulsewidth_us(1000);// Servo in
+                    break;
+        case '3' :  servo3.pulsewidth_us(2000);// Servo out
+                    wait(1);
+                    motorun(100); // Move shelf down slightly
+                    wait(1);
+                    servo3.pulsewidth_us(1000);// Servo in
+                    break;
+        default  :  break;
 
-//===[End of Stepper Class]===
-int main() {
-  Stepper leadscrew_motor1(PB_12, PA_11, PB_5, 0, 200, 32); // 3
-  Stepper leadscrew_motor2(PB_1, PB_2, PB_3, 0, 200, 32); // 3
-  Initialise();
-  leadscrew_motor1.initialise();
-  leadscrew_motor2.initialise();
-
-  // put your setup code here, to run once:
-
-  while(1) {
-    leadscrew_motor1.run(250);
-    leadscrew_motor2.run(250);
-
-    // put your main code here, to run repeatedly:
-  }
+    }
+    toggleDirection();
+    wait(1);
+    stepperInitialise(); // Return Shelf to home
 }
