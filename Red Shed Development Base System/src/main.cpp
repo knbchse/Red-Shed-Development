@@ -160,8 +160,12 @@ int main()
     direction = 0;
     endstop.mode(PullUp);
     lcd.Initialise();
-    servo.period_us(20000); //-- 20 ms time period
-    servo.pulsewidth_us(1000); //-- pulse width of 1 ms; 0 degrees'
+    servo1.period_us(20000); //-- 20 ms time period
+    servo1.pulsewidth_us(1000); //-- pulse width of 1 ms; 0 degrees'
+    servo2.period_us(20000); //-- 20 ms time period
+    servo2.pulsewidth_us(1000); //-- pulse width of 1 ms; 0 degrees'
+    servo3.period_us(20000); //-- 20 ms time period
+    servo3.pulsewidth_us(1000); //-- pulse width of 1 ms; 0 degrees'
     while (1) {
 
         char s[80];

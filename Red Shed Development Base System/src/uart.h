@@ -6,7 +6,7 @@
 class Uart : public RawSerial
 {
 public:
-    Uart::Uart(PinName tx, PinName rx) : RawSerial(tx, rx), newlines(0) {
+    Uart(PinName tx, PinName rx) : RawSerial(tx, rx), newlines(0) {
         attach(callback(this, &Uart::rxHandler), RxIrq);
 //      attach(callback(this, &Uart::txHandler), TxIrq);
 
