@@ -32,9 +32,9 @@ void motorun(int duration)
     for (int i = 0; i < duration; i++)
     {
         stepper.write(1);
-        wait_ms(2);
+        wait_ms(1);
         stepper.write(0);
-        wait_ms(2);
+        wait_ms(1);
     }
 }
 
@@ -43,9 +43,9 @@ void stepperInitialise(void)
     while(1)
     {
         stepper.write(1);
-        wait_ms(2);
+        wait_ms(1);
         stepper.write(0);
-        wait_ms(2);
+        wait_ms(1);
         if (endstop == 0)
         {
             return;
@@ -76,7 +76,6 @@ class LCD
 
 void LCD::Initialise(void)
 {
-
     lcdEN.write(0); //-- GPIO_WriteBit(GPIOC, LCD_EN, Bit_RESET);
     wait_us(15000); //-- delay for >15msec second after power on
     lcdInit8Bit(0x30); //-- we are in "8bit" mode
@@ -94,12 +93,14 @@ void LCD::Initialise(void)
 }
 
 
-void LCD::lcdSetRS(int mode) {
+void LCD::lcdSetRS(int mode)
+{
     lcdRS.write(mode);
 }
 
 
-void LCD::lcdPulseEN(void)  {
+void LCD::lcdPulseEN(void)
+{
     lcdEN.write(1);
     wait_us(1); //-- enable pulse must be >450ns
     lcdEN.write(0);
@@ -107,7 +108,8 @@ void LCD::lcdPulseEN(void)  {
 }
 
 
-void LCD::lcdInit8Bit(unsigned char command)  {
+void LCD::lcdInit8Bit(unsigned char command)
+{
     lcdSetRS(LCD_INSTRUCTION);
     lcdD4.write((command>>4) & 0x01); //-- bottom 4 bits
     lcdD5.write((command>>5) & 0x01); //-- are ignored
@@ -118,7 +120,8 @@ void LCD::lcdInit8Bit(unsigned char command)  {
 }
 
 
-void LCD::lcdCommand(unsigned char command)  {
+void LCD::lcdCommand(unsigned char command)
+{
     lcdSetRS(LCD_INSTRUCTION);
     lcdD4.write((command>>4) & 0x01);
     lcdD5.write((command>>5) & 0x01);
@@ -134,7 +137,8 @@ void LCD::lcdCommand(unsigned char command)  {
 }
 
 
-void LCD::lcdPutChar(unsigned char c)  {
+void LCD::lcdPutChar(unsigned char c)
+{
     lcdSetRS(LCD_DATA);
     lcdD4.write((c>>4) & 0x01);
     lcdD5.write((c>>5) & 0x01);
@@ -168,28 +172,26 @@ int main()
     servo3.pulsewidth_us(1000); //-- pulse width of 1 ms; 0 degrees'
     while (1) {
 
-        char s[80];
-        if (uart.canReadLine()) {
-            uart.readLine(s);
-            s[strlen(s)-1] = '\0';
+        char s[80];                   // Creates a buffer for uart input
+        if (uart.canReadLine()) {     // I uart sends a string
+            uart.readLine(s);         // Reads the input string
+            s[strlen(s)-1] = '\0';    // Ends the buffer with a NULL character
         }
 
-        if (s[0] == 'R')       {
-            lcd.Initialise();
-            sprintf(str1, "Retrieving %c %c", s[1], s[2]);
+        if (s[0] == 'R')       {                            // If the first letter is 's'
+            lcd.Initialise();                               // Init the LCD
+            sprintf(str1, "Retrieving %c%c", s[1], s[2]);   // Outputs command to LCD
             i = 0;
-            while(str1[i]) {
-                lcd.lcdPutChar(str1[i]);
+            while(str1[i]) {                                // While the string is not finished
+                lcd.lcdPutChar(str1[i]);                    // Outputs character to LCD
                 i++;
             }
-            Retrieve(s[1], s[2]);
+            Retrieve(s[1], s[2]);                           // Command to retrieve a pallete
             wait(2);
             lcd.lcdCommand(0x01); //-- display clear
-            wait_us(2000); //-- needs a 2msec delay
-            lcd.lcdCommand(0x06); //-- cursor increments
             sprintf(str1, "D\n");
             uart.putString(str1);
-            sprintf(str1, "Done");
+            sprintf(str1, "Ready");
             i = 0;
             while(str1[i]) {
                 lcd.lcdPutChar(str1[i]);
@@ -199,7 +201,7 @@ int main()
 
         if (s[0] == 'S')  {
             lcd.Initialise();
-            sprintf(str1, "Storing in %c %c", s[1], s[2]);
+            sprintf(str1, "Storing in %c%c", s[1], s[2]);
             i = 0;
             while(str1[i]) {
                 lcd.lcdPutChar(str1[i]);
@@ -208,11 +210,9 @@ int main()
             Store(s[1], s[2]);
             wait(2);
             lcd.lcdCommand(0x01); //-- display clear
-            wait_us(2000); //-- needs a 2msec delay
-            lcd.lcdCommand(0x06); //-- cursor increments
             sprintf(str1, "D\n");
             uart.putString(str1);
-            sprintf(str1, "Done");
+            sprintf(str1, "Ready");
             i = 0;
             while(str1[i]) {
                 lcd.lcdPutChar(str1[i]);
