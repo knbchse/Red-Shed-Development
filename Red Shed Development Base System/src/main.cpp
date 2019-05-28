@@ -18,34 +18,43 @@ char str1[16];
 int i;
 void Store(char column, char level);
 void Retrieve(char column, char level);
-void toggleDirection(void);
 void stepperInitialise(void);
-void motorun(int duration);
+void motorunup(int duration);
+void motorundown(int duration);
 
-void toggleDirection(void)
+void motorunup(int duration)
 {
-    direction = ~direction;
-}
-
-void motorun(int duration)
-{
+    direction = 0;
     for (int i = 0; i < duration; i++)
     {
         stepper.write(1);
-        wait_ms(1);
+        wait_us(500);
         stepper.write(0);
-        wait_ms(1);
+        wait_us(500);
+    }
+}
+
+void motorundown(int duration)
+{
+    direction = 1;
+    for (int i = 0; i < duration; i++)
+    {
+        stepper.write(1);
+        wait_us(500);
+        stepper.write(0);
+        wait_us(500);
     }
 }
 
 void stepperInitialise(void)
 {
+    direction = 1;
     while(1)
     {
         stepper.write(1);
-        wait_ms(1);
+        wait_us(500);
         stepper.write(0);
-        wait_ms(1);
+        wait_us(500);
         if (endstop == 0)
         {
             return;
@@ -161,7 +170,7 @@ int main()
 {
     LCD lcd(PA_9, PA_8, PB_10, PB_4, PC_7, PB_6);
     stepperInitialise();
-    direction = 0;
+    direction = 1;
     endstop.mode(PullUp);
     lcd.Initialise();
     servo1.period_us(20000); //-- 20 ms time period
@@ -227,31 +236,30 @@ void Store(char column, char level)
 {
     if(level == 'A')
     {
-        motorun(250); // Initial Height level A set
+        motorunup(7000); // Initial Height level A set
     }
     else
     {
-        motorun(500); // Initial Height level B set
+        motorunup(13000); // Initial Height level B set
     }
     wait(1);
-    toggleDirection();
     switch (column)
     {
         case '1' :  servo1.pulsewidth_us(2000);// Servo out
                     wait(1);
-                    motorun(100); // Move shelf down slightly
+                    motorundown(1000); // Move shelf down slightly
                     wait(1);
                     servo1.pulsewidth_us(1000);// Servo in
                     break;
         case '2' :  servo2.pulsewidth_us(2000);// Servo out
                     wait(1);
-                    motorun(100); // Move shelf down slightly
+                    motorundown(1000); // Move shelf down slightly
                     wait(1);
                     servo2.pulsewidth_us(1000);// Servo in
                     break;
         case '3' :  servo3.pulsewidth_us(2000);// Servo out
                     wait(1);
-                    motorun(100); // Move shelf down slightly
+                    motorundown(1000); // Move shelf down slightly
                     wait(1);
                     servo3.pulsewidth_us(1000);// Servo in
                     break;
@@ -266,36 +274,35 @@ void Retrieve(char column, char level)
 {
     if(level == 'A')
     {
-        motorun(245); // Initial Height level A set
+        motorunup(3000); // Initial Height level A set
     }
     else
     {
-        motorun(495); // Initial Height level B set
+        motorunup(6000); // Initial Height level B set
     }
     wait(1);
     switch (column)
     {
         case '1' :  servo1.pulsewidth_us(2000);// Servo out
                     wait(1);
-                    motorun(100); // Move shelf down slightly
+                    motorunup(1000); // Move shelf down slightly
                     wait(1);
                     servo1.pulsewidth_us(1000);// Servo in
                     break;
         case '2' :  servo2.pulsewidth_us(2000);// Servo out
                     wait(1);
-                    motorun(100); // Move shelf down slightly
+                    motorunup(1000); // Move shelf down slightly
                     wait(1);
                     servo2.pulsewidth_us(1000);// Servo in
                     break;
         case '3' :  servo3.pulsewidth_us(2000);// Servo out
                     wait(1);
-                    motorun(100); // Move shelf down slightly
+                    motorunup(1000); // Move shelf down slightly
                     wait(1);
                     servo3.pulsewidth_us(1000);// Servo in
                     break;
         default  :  break;
     }
-    toggleDirection();
     wait(1);
     stepperInitialise(); // Return Shelf to home
 }
