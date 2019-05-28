@@ -294,7 +294,6 @@ void Retrieve(char column, char level)
                     servo3.pulsewidth_us(1000);// Servo in
                     break;
         default  :  break;
-
     }
     toggleDirection();
     wait(1);
